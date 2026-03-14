@@ -2,25 +2,33 @@
 name = "p4stdtest"
 version = "0.1.0"
 edition = "2021"
-resolver = "2"
 rust-version = "1.82"
+resolver = "2"
+
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "waveshare/esp_lcd_jd9365_10_1", version = "^1.0.3" }
+bindings_header = "bindings.h"
 
 [[bin]]
+harness = false  # do not use the built-in cargo test harness -> resolve rust-analyzer errors
 name = "p4stdtest"
-harness = false # do not use the built-in cargo test harness -> resolve rust-analyzer errors
-
-[profile.release]
-opt-level = "s"
-
-[profile.dev]
-debug = true    # Symbols are nice, and they don't increase the size on Flash
-opt-level = "z"
 
 [dependencies]
-log = "0.4"
-esp-idf-svc = { version = "0.52.1", features = ["critical-section", "embassy-time-driver", "embassy-sync"] }
 # Remove `generic-queue-8` if you plan to use `embassy-time` WITH `embassy-executor`
 embassy-time = { version = "0.5", features = ["generic-queue-8"] }
+esp-idf-svc = { version = "0.52.1", features = [
+  "critical-section",
+  "embassy-sync",
+  "embassy-time-driver"
+] }
+log = "0.4"
 
 [build-dependencies]
 embuild = "0.33"
+
+[profile.dev]
+opt-level = "z"
+debug = true  # Symbols are nice, and they don't increase the size on Flash
+
+[profile.release]
+opt-level = "s"
