@@ -1,18 +1,21 @@
 use std::ffi::c_void;
 
-use esp_idf_svc::sys::{
-    esp_lcd_dbi_io_config_t, esp_lcd_dpi_panel_config_t,
-    esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags, esp_lcd_dsi_bus_config_t,
-    esp_lcd_dsi_bus_handle_t, esp_lcd_new_dsi_bus, esp_lcd_new_panel_io_dbi,
-    esp_lcd_new_panel_jd9365, esp_lcd_panel_dev_config_t, esp_lcd_panel_disp_on_off,
-    esp_lcd_panel_handle_t, esp_lcd_panel_init, esp_lcd_panel_io_handle_t, esp_lcd_panel_reset,
-    esp_lcd_video_timing_t, esp_ldo_acquire_channel, esp_ldo_channel_config_t,
-    esp_ldo_channel_handle_t, jd9365_vendor_config_t, jd9365_vendor_config_t__bindgen_ty_1,
-    lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB888,
-    soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
+use esp_idf_svc::{
+    hal::lcd::PanelHandle,
+    sys::{
+        esp_lcd_dbi_io_config_t, esp_lcd_dpi_panel_config_t,
+        esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags, esp_lcd_dsi_bus_config_t,
+        esp_lcd_dsi_bus_handle_t, esp_lcd_new_dsi_bus, esp_lcd_new_panel_io_dbi,
+        esp_lcd_new_panel_jd9365, esp_lcd_panel_dev_config_t, esp_lcd_panel_disp_on_off,
+        esp_lcd_panel_handle_t, esp_lcd_panel_init, esp_lcd_panel_io_handle_t, esp_lcd_panel_reset,
+        esp_lcd_video_timing_t, esp_ldo_acquire_channel, esp_ldo_channel_config_t,
+        esp_ldo_channel_handle_t, jd9365_vendor_config_t, jd9365_vendor_config_t__bindgen_ty_1,
+        lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB565,
+        soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
+    },
 };
 
-pub fn init_lcd() {
+pub fn init_lcd() -> PanelHandle {
     unsafe {
         log::info!("MIPI DSI PHY Powered on");
 
@@ -51,7 +54,7 @@ pub fn init_lcd() {
             dpi_clk_src: soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
             dpi_clock_freq_mhz: 80,
             virtual_channel: 0,
-            pixel_format: lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB888,
+            pixel_format: lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB565,
             num_fbs: 1,
             video_timing: esp_lcd_video_timing_t {
                 h_size: 800,
@@ -78,7 +81,7 @@ pub fn init_lcd() {
         let panel_config = esp_lcd_panel_dev_config_t {
             reset_gpio_num: -1, // Set to -1 if not use
             //rgb_ele_order : lcd_color_format_t_LCD_COLOR_FMT_RGB888,     // Implemented by LCD command `36h`
-            bits_per_pixel: 24, // Implemented by LCD command `3Ah` (16/18/24)
+            bits_per_pixel: 16, // Implemented by LCD command `3Ah` (16/18/24)
             vendor_config: &mut vendor_config as *mut _ as *mut c_void,
             ..Default::default()
         };
@@ -86,5 +89,7 @@ pub fn init_lcd() {
         esp_lcd_panel_reset(panel_handle);
         esp_lcd_panel_init(panel_handle);
         esp_lcd_panel_disp_on_off(panel_handle, true);
+
+        panel_handle
     }
 }

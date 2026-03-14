@@ -26,7 +26,7 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 5.3.4
+    version: 5.3.3
   waveshare/esp_lcd_jd9365_10_1:
     component_hash: 6c1336b93a37df2b5be42c49c4c364d0bacdbf96f053a934f881349457fac679
     dependencies:
