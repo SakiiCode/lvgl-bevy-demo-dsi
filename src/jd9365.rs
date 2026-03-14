@@ -8,7 +8,8 @@ use esp_idf_svc::sys::{
     esp_lcd_panel_handle_t, esp_lcd_panel_init, esp_lcd_panel_io_handle_t, esp_lcd_panel_reset,
     esp_lcd_video_timing_t, esp_ldo_acquire_channel, esp_ldo_channel_config_t,
     esp_ldo_channel_handle_t, jd9365_vendor_config_t, jd9365_vendor_config_t__bindgen_ty_1,
-    lcd_color_format_t_LCD_COLOR_FMT_RGB888, soc_module_clk_t_SOC_MOD_CLK_PLL_F240M, vTaskDelay,
+    lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB888,
+    soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
 };
 
 pub fn init_lcd() {
@@ -45,12 +46,12 @@ pub fn init_lcd() {
         log::info!("Install JD9365S panel driver");
         let mut panel_handle = esp_lcd_panel_handle_t::default();
         let mut dpi_config_flags = esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags::default();
-        dpi_config_flags.set_use_dma2d(1);
+        dpi_config_flags.set_use_dma2d(0);
         let dpi_config = esp_lcd_dpi_panel_config_t {
             dpi_clk_src: soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
             dpi_clock_freq_mhz: 80,
             virtual_channel: 0,
-            pixel_format: lcd_color_format_t_LCD_COLOR_FMT_RGB888,
+            pixel_format: lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB888,
             num_fbs: 1,
             video_timing: esp_lcd_video_timing_t {
                 h_size: 800,
@@ -73,7 +74,7 @@ pub fn init_lcd() {
             },
             ..Default::default()
         };
-        //vendor_config.flags.set_use_mipi_interface(1);
+        vendor_config.flags.set_use_mipi_interface(1);
         let panel_config = esp_lcd_panel_dev_config_t {
             reset_gpio_num: -1, // Set to -1 if not use
             //rgb_ele_order : lcd_color_format_t_LCD_COLOR_FMT_RGB888,     // Implemented by LCD command `36h`
@@ -81,14 +82,9 @@ pub fn init_lcd() {
             vendor_config: &mut vendor_config as *mut _ as *mut c_void,
             ..Default::default()
         };
-        (esp_lcd_new_panel_jd9365(mipi_dbi_io, &panel_config, &mut panel_handle));
-        if panel_handle == core::ptr::null_mut() {
-            loop {
-                vTaskDelay(1000);
-            }
-        }
-        (esp_lcd_panel_reset(panel_handle));
-        (esp_lcd_panel_init(panel_handle));
-        (esp_lcd_panel_disp_on_off(panel_handle, true));
+        esp_lcd_new_panel_jd9365(mipi_dbi_io, &panel_config, &mut panel_handle);
+        esp_lcd_panel_reset(panel_handle);
+        esp_lcd_panel_init(panel_handle);
+        esp_lcd_panel_disp_on_off(panel_handle, true);
     }
 }
