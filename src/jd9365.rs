@@ -8,7 +8,7 @@ use esp_idf_svc::sys::{
     esp_lcd_panel_handle_t, esp_lcd_panel_init, esp_lcd_panel_io_handle_t, esp_lcd_panel_reset,
     esp_lcd_video_timing_t, esp_ldo_acquire_channel, esp_ldo_channel_config_t,
     esp_ldo_channel_handle_t, jd9365_vendor_config_t, jd9365_vendor_config_t__bindgen_ty_1,
-    lcd_color_format_t_LCD_COLOR_FMT_RGB888, soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
+    lcd_color_format_t_LCD_COLOR_FMT_RGB888, soc_module_clk_t_SOC_MOD_CLK_PLL_F240M, vTaskDelay,
 };
 
 pub fn init_lcd() {
@@ -29,7 +29,7 @@ pub fn init_lcd() {
             bus_id: 0,
             num_data_lanes: 2,
             phy_clk_src: 0,
-            lane_bit_rate_mbps: 1500.0,
+            lane_bit_rate_mbps: 1500,
         };
         esp_lcd_new_dsi_bus(&bus_config, &mut mipi_dsi_bus);
 
@@ -48,7 +48,7 @@ pub fn init_lcd() {
         dpi_config_flags.set_use_dma2d(1);
         let dpi_config = esp_lcd_dpi_panel_config_t {
             dpi_clk_src: soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
-            dpi_clock_freq_mhz: 80.0,
+            dpi_clock_freq_mhz: 80,
             virtual_channel: 0,
             pixel_format: lcd_color_format_t_LCD_COLOR_FMT_RGB888,
             num_fbs: 1,
@@ -82,6 +82,11 @@ pub fn init_lcd() {
             ..Default::default()
         };
         (esp_lcd_new_panel_jd9365(mipi_dbi_io, &panel_config, &mut panel_handle));
+        if panel_handle == core::ptr::null_mut() {
+            loop {
+                vTaskDelay(1000);
+            }
+        }
         (esp_lcd_panel_reset(panel_handle));
         (esp_lcd_panel_init(panel_handle));
         (esp_lcd_panel_disp_on_off(panel_handle, true));
