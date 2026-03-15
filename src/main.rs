@@ -1,17 +1,34 @@
+use std::mem::MaybeUninit;
+
 use crate::jd9365::init_lcd;
 use embedded_graphics::pixelcolor::Rgb565;
-use esp_idf_svc::sys::{esp_lcd_panel_draw_bitmap, xTaskGetTickCount};
+use esp_idf_svc::sys::{
+    MALLOC_CAP_DEFAULT, esp_lcd_panel_draw_bitmap, heap_caps_get_info, multi_heap_info_t,
+    xTaskGetTickCount,
+};
 use lv_bevy_ecs::{
     display::{Display, DrawBuffer},
     functions::*,
-    sys::{lv_mem_monitor_t, LV_DEF_REFR_PERIOD, LV_NO_TIMER_READY},
+    sys::{LV_DEF_REFR_PERIOD, LV_NO_TIMER_READY, lv_mem_monitor_t},
     widgets::{Label, Widget},
 };
 
 mod jd9365;
 
-#[no_mangle]
-pub fn get_memory_stats(_monitor: &mut lv_mem_monitor_t) {}
+#[unsafe(no_mangle)]
+pub fn get_memory_stats(monitor: &mut lv_mem_monitor_t) {
+    #[allow(static_mut_refs)]
+    unsafe {
+        static mut MEM_INFO: multi_heap_info_t =
+            unsafe { MaybeUninit::<multi_heap_info_t>::zeroed().assume_init() };
+        heap_caps_get_info(&mut MEM_INFO, MALLOC_CAP_DEFAULT);
+        monitor.free_cnt = MEM_INFO.free_blocks;
+        monitor.used_cnt = MEM_INFO.allocated_blocks;
+        monitor.free_biggest_size = MEM_INFO.largest_free_block;
+        monitor.used_cnt = MEM_INFO.allocated_blocks;
+        monitor.max_used = usize::max(MEM_INFO.allocated_blocks, monitor.max_used);
+    }
+}
 
 fn main() {
     // It is necessary to call this function once. Otherwise, some patches to the runtime
