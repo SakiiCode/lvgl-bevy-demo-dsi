@@ -1,4 +1,4 @@
-include = ["config-local.toml"]
+include = [{ path = "config-local.toml", optional = true }]
 
 [build]
 target = "riscv32imafc-esp-espidf"

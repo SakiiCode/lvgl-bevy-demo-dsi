@@ -1,6 +1,5 @@
 use std::mem::MaybeUninit;
 
-use crate::jd9365::init_lcd;
 use embedded_graphics::pixelcolor::Rgb565;
 use esp_idf_svc::sys::{
     MALLOC_CAP_DEFAULT, esp_lcd_panel_draw_bitmap, heap_caps_get_info, multi_heap_info_t,
@@ -13,6 +12,7 @@ use lv_bevy_ecs::{
     widgets::{Label, Widget},
 };
 
+mod hx8394;
 mod jd9365;
 
 #[unsafe(no_mangle)]
@@ -40,7 +40,8 @@ fn main() {
 
     log::info!("Hello, world!");
 
-    let panel_handle = init_lcd();
+    // let panel_handle = crate::jd9365::init_lcd();
+    let panel_handle = crate::hx8394::init_lcd();
 
     assert_ne!(panel_handle, core::ptr::null_mut());
 
@@ -48,7 +49,7 @@ fn main() {
 
     lv_tick_set_cb(|| unsafe { xTaskGetTickCount() });
 
-    const HOR_RES: u32 = 800;
+    const HOR_RES: u32 = 700;
     const VER_RES: u32 = 1280;
     const LINE_HEIGHT: u32 = VER_RES / 40;
 

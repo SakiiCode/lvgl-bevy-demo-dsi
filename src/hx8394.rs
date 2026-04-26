@@ -5,11 +5,11 @@ use esp_idf_svc::{
     sys::{
         esp_lcd_dbi_io_config_t, esp_lcd_dpi_panel_config_t,
         esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags, esp_lcd_dsi_bus_config_t,
-        esp_lcd_dsi_bus_handle_t, esp_lcd_new_dsi_bus, esp_lcd_new_panel_io_dbi,
-        esp_lcd_new_panel_jd9365, esp_lcd_panel_dev_config_t, esp_lcd_panel_disp_on_off,
+        esp_lcd_dsi_bus_handle_t, esp_lcd_new_dsi_bus, esp_lcd_new_panel_hx8394,
+        esp_lcd_new_panel_io_dbi, esp_lcd_panel_dev_config_t, esp_lcd_panel_disp_on_off,
         esp_lcd_panel_handle_t, esp_lcd_panel_init, esp_lcd_panel_io_handle_t, esp_lcd_panel_reset,
         esp_lcd_video_timing_t, esp_ldo_acquire_channel, esp_ldo_channel_config_t,
-        esp_ldo_channel_handle_t, jd9365_vendor_config_t, jd9365_vendor_config_t__bindgen_ty_1,
+        esp_ldo_channel_handle_t, hx8394_vendor_config_t, hx8394_vendor_config_t__bindgen_ty_1,
         lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB565,
         soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
     },
@@ -34,43 +34,44 @@ pub fn init_lcd() -> PanelHandle {
             bus_id: 0,
             num_data_lanes: 2,
             phy_clk_src: 0,
-            lane_bit_rate_mbps: 1500,
+            lane_bit_rate_mbps: 700,
         };
         esp_lcd_new_dsi_bus(&bus_config, &mut mipi_dsi_bus);
 
         log::info!("Install panel IO");
         let mut mipi_dbi_io = esp_lcd_panel_io_handle_t::default();
         let dbi_config = esp_lcd_dbi_io_config_t {
+            virtual_channel: 0,
             lcd_cmd_bits: 8,
             lcd_param_bits: 8,
-            virtual_channel: 0,
         };
         esp_lcd_new_panel_io_dbi(mipi_dsi_bus, &dbi_config, &mut mipi_dbi_io);
 
-        log::info!("Install JD9365S panel driver");
+        log::info!("Install HX8394 panel driver");
         let mut panel_handle = esp_lcd_panel_handle_t::default();
         let mut dpi_config_flags = esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags::default();
         dpi_config_flags.set_use_dma2d(0);
         let dpi_config = esp_lcd_dpi_panel_config_t {
             dpi_clk_src: soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
-            dpi_clock_freq_mhz: 80,
+            dpi_clock_freq_mhz: 58,
             virtual_channel: 0,
             pixel_format: lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB565,
             num_fbs: 1,
             video_timing: esp_lcd_video_timing_t {
-                h_size: 800,
+                h_size: 720,
                 v_size: 1280,
                 hsync_back_porch: 20,
                 hsync_pulse_width: 20,
                 hsync_front_porch: 40,
                 vsync_back_porch: 10,
                 vsync_pulse_width: 4,
-                vsync_front_porch: 30,
+                vsync_front_porch: 24,
             },
             ..Default::default()
-        }; //JD9365_800_1280_PANEL_60HZ_DPI_CONFIG(EXAMPLE_MIPI_DPI_PX_FORMAT);
-        let mut vendor_config = jd9365_vendor_config_t {
-            mipi_config: jd9365_vendor_config_t__bindgen_ty_1 {
+        };
+        //HX8394_720_1280_PANEL_30HZ_DPI_CONFIG(EXAMPLE_MIPI_DPI_PX_FORMAT);
+        let mut vendor_config = hx8394_vendor_config_t {
+            mipi_config: hx8394_vendor_config_t__bindgen_ty_1 {
                 lane_num: 2,
                 dsi_bus: mipi_dsi_bus,
                 dpi_config: &dpi_config,
@@ -86,7 +87,7 @@ pub fn init_lcd() -> PanelHandle {
             vendor_config: &mut vendor_config as *mut _ as *mut c_void,
             ..Default::default()
         };
-        esp_lcd_new_panel_jd9365(mipi_dbi_io, &panel_config, &mut panel_handle);
+        esp_lcd_new_panel_hx8394(mipi_dbi_io, &panel_config, &mut panel_handle);
         esp_lcd_panel_reset(panel_handle);
         esp_lcd_panel_init(panel_handle);
         esp_lcd_panel_disp_on_off(panel_handle, true);

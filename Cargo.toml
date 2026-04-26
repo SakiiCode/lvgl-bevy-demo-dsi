@@ -5,7 +5,11 @@ edition = "2024"
 resolver = "2"
 
 [[package.metadata.esp-idf-sys.extra_components]]
-remote_component = { name = "waveshare/esp_lcd_jd9365_10_1", version = "^1.0.3" }
+remote_component = { name = "waveshare/esp_lcd_jd9365", version = "^1.0.6" }
+bindings_header = "bindings.h"
+
+[[package.metadata.esp-idf-sys.extra_components]]
+remote_component = { name = "waveshare/esp_lcd_hx8394", version = "^1.0.3" }
 bindings_header = "bindings.h"
 
 [[bin]]
