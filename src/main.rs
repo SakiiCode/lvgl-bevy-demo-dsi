@@ -2,14 +2,16 @@ use std::mem::MaybeUninit;
 
 use embedded_graphics::pixelcolor::Rgb565;
 use esp_idf_svc::sys::{
-    MALLOC_CAP_DEFAULT, esp_lcd_panel_draw_bitmap, heap_caps_get_info, multi_heap_info_t,
-    xTaskGetTickCount,
+    MALLOC_CAP_DEFAULT, MALLOC_CAP_DMA, MALLOC_CAP_SPIRAM, esp_lcd_dpi_panel_event_callbacks_t,
+    esp_lcd_dpi_panel_register_event_callbacks, esp_lcd_panel_draw_bitmap, esp_log_level_set,
+    esp_log_level_t_ESP_LOG_DEBUG, esp_log_level_t_ESP_LOG_INFO, heap_caps_get_info,
+    heap_caps_malloc, multi_heap_info_t, xTaskGetTickCount,
 };
 use lv_bevy_ecs::{
-    display::{Display, DrawBuffer},
+    display::{Display, RenderMode},
     functions::*,
-    sys::{LV_DEF_REFR_PERIOD, LV_NO_TIMER_READY, lv_mem_monitor_t},
-    widgets::{Label, Widget},
+    sys::{LV_COLOR_DEPTH, LV_DEF_REFR_PERIOD, lv_mem_monitor_t},
+    widgets::Label,
 };
 
 mod hx8394;
@@ -35,8 +37,15 @@ fn main() {
     // implemented by esp-idf-sys might not link properly. See https://github.com/esp-rs/esp-idf-template/issues/71
     esp_idf_svc::sys::link_patches();
 
-    // Bind the log crate to the ESP Logging facilities
     esp_idf_svc::log::EspLogger::initialize_default();
+
+    lv_init();
+    lv_bevy_ecs::logging::connect();
+
+    unsafe {
+        esp_log_level_set(c"*".as_ptr(), esp_log_level_t_ESP_LOG_DEBUG);
+        esp_log_level_set(c"lcd.dsi.dpi".as_ptr(), esp_log_level_t_ESP_LOG_INFO);
+    }
 
     log::info!("Hello, world!");
 
@@ -45,19 +54,31 @@ fn main() {
 
     assert_ne!(panel_handle, core::ptr::null_mut());
 
-    lv_init();
-
     lv_tick_set_cb(|| unsafe { xTaskGetTickCount() });
 
-    const HOR_RES: u32 = 700;
+    const HOR_RES: u32 = 720;
     const VER_RES: u32 = 1280;
     const LINE_HEIGHT: u32 = VER_RES / 40;
 
-    let mut display = Display::create(HOR_RES as i32, VER_RES as i32);
-    let buffer =
-        DrawBuffer::<{ (HOR_RES * LINE_HEIGHT) as usize }, Rgb565>::create(HOR_RES, LINE_HEIGHT);
+    let mut display = Display::new(HOR_RES as i32, VER_RES as i32);
+    // let buffer =
+    //     DrawBuffer::<{ (HOR_RES * LINE_HEIGHT) as usize }, Rgb565>::new(HOR_RES, LINE_HEIGHT);
+    const BUFFER_LEN: usize = (HOR_RES * LINE_HEIGHT * LV_COLOR_DEPTH / 8) as usize;
+    let buffer = unsafe {
+        let ptr = heap_caps_malloc(BUFFER_LEN, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA).cast::<u8>();
+        core::slice::from_raw_parts_mut(ptr, BUFFER_LEN)
+    };
     log::info!("Display OK");
-    display.register(buffer, |refresh| {
+
+    unsafe {
+        let cbs = esp_lcd_dpi_panel_event_callbacks_t {
+            on_color_trans_done: Some(crate::hx8394::notify_lvgl_flush_ready),
+            ..Default::default()
+        };
+        esp_lcd_dpi_panel_register_event_callbacks(panel_handle, &cbs, display.raw_mut().cast());
+    }
+
+    display.register_raw::<_, BUFFER_LEN, Rgb565>(buffer, RenderMode::Partial, |refresh| {
         let area = refresh.rectangle;
 
         let x_start = area.top_left.x;
@@ -79,19 +100,28 @@ fn main() {
 
     log::info!("Draw Buffer OK");
 
-    let mut label = Label::create_widget();
-    lv_label_set_text(&mut label, c"asdasd");
-    Widget::leak(label);
+    let mut label = Label::new();
+    label.set_text(c"asdasd");
+    label.leak();
 
-    let mut tick = unsafe { xTaskGetTickCount() };
+    unsafe {
+        esp_idf_svc::sys::heap_caps_check_integrity_all(true);
+    }
 
     loop {
         unsafe {
-            let delay = lv_timer_handler();
-            if delay != LV_NO_TIMER_READY && delay > 0 {
-                esp_idf_svc::sys::xTaskDelayUntil(&mut tick, delay);
-            } else {
-                esp_idf_svc::sys::vTaskDelay(LV_DEF_REFR_PERIOD);
+            let mut tick = xTaskGetTickCount();
+            let next_timer = lv_timer_handler();
+            match next_timer {
+                NextTimerPeriod::Ready => {
+                    continue;
+                }
+                NextTimerPeriod::AfterMs(delay) => {
+                    esp_idf_svc::sys::xTaskDelayUntil(&mut tick, delay.get());
+                }
+                NextTimerPeriod::Never => {
+                    esp_idf_svc::sys::vTaskDelay(LV_DEF_REFR_PERIOD);
+                }
             }
         }
     }

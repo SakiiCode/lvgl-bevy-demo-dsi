@@ -4,16 +4,18 @@ use esp_idf_svc::{
     hal::lcd::PanelHandle,
     sys::{
         esp_lcd_dbi_io_config_t, esp_lcd_dpi_panel_config_t,
-        esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags, esp_lcd_dsi_bus_config_t,
-        esp_lcd_dsi_bus_handle_t, esp_lcd_new_dsi_bus, esp_lcd_new_panel_hx8394,
-        esp_lcd_new_panel_io_dbi, esp_lcd_panel_dev_config_t, esp_lcd_panel_disp_on_off,
-        esp_lcd_panel_handle_t, esp_lcd_panel_init, esp_lcd_panel_io_handle_t, esp_lcd_panel_reset,
-        esp_lcd_video_timing_t, esp_ldo_acquire_channel, esp_ldo_channel_config_t,
-        esp_ldo_channel_handle_t, hx8394_vendor_config_t, hx8394_vendor_config_t__bindgen_ty_1,
+        esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags, esp_lcd_dpi_panel_event_data_t,
+        esp_lcd_dsi_bus_config_t, esp_lcd_dsi_bus_handle_t, esp_lcd_new_dsi_bus,
+        esp_lcd_new_panel_hx8394, esp_lcd_new_panel_io_dbi, esp_lcd_panel_dev_config_t,
+        esp_lcd_panel_disp_on_off, esp_lcd_panel_handle_t, esp_lcd_panel_init,
+        esp_lcd_panel_io_handle_t, esp_lcd_panel_reset, esp_lcd_video_timing_t,
+        esp_ldo_acquire_channel, esp_ldo_channel_config_t, esp_ldo_channel_handle_t,
+        hx8394_vendor_config_t, hx8394_vendor_config_t__bindgen_ty_1,
         lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB565,
         soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
     },
 };
+use lv_bevy_ecs::sys::{lv_display_flush_ready, lv_display_t};
 
 #[allow(unused)]
 pub fn init_lcd() -> PanelHandle {
@@ -50,7 +52,7 @@ pub fn init_lcd() -> PanelHandle {
         log::info!("Install HX8394 panel driver");
         let mut panel_handle = esp_lcd_panel_handle_t::default();
         let mut dpi_config_flags = esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags::default();
-        dpi_config_flags.set_use_dma2d(0);
+        dpi_config_flags.set_use_dma2d(1);
         let dpi_config = esp_lcd_dpi_panel_config_t {
             dpi_clk_src: soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
             dpi_clock_freq_mhz: 58,
@@ -67,6 +69,7 @@ pub fn init_lcd() -> PanelHandle {
                 vsync_pulse_width: 4,
                 vsync_front_porch: 24,
             },
+            flags: dpi_config_flags,
             ..Default::default()
         };
         //HX8394_720_1280_PANEL_30HZ_DPI_CONFIG(EXAMPLE_MIPI_DPI_PX_FORMAT);
@@ -82,7 +85,7 @@ pub fn init_lcd() -> PanelHandle {
         //vendor_config.flags.set_use_mipi_interface(1);
         let panel_config = esp_lcd_panel_dev_config_t {
             reset_gpio_num: -1, // Set to -1 if not use
-            //rgb_ele_order : lcd_color_format_t_LCD_COLOR_FMT_RGB888,     // Implemented by LCD command `36h`
+            //rgb_ele_order: lcd_rgb_element_order_t_LCD_RGB_ELEMENT_ORDER_RGB, // Implemented by LCD command `36h`
             bits_per_pixel: 16, // Implemented by LCD command `3Ah` (16/18/24)
             vendor_config: &mut vendor_config as *mut _ as *mut c_void,
             ..Default::default()
@@ -93,5 +96,17 @@ pub fn init_lcd() -> PanelHandle {
         esp_lcd_panel_disp_on_off(panel_handle, true);
 
         panel_handle
+    }
+}
+
+pub extern "C" fn notify_lvgl_flush_ready(
+    _panel: esp_lcd_panel_handle_t,
+    _edata: *mut esp_lcd_dpi_panel_event_data_t,
+    user_ctx: *mut c_void,
+) -> bool {
+    unsafe {
+        let disp: *mut lv_display_t = user_ctx.cast();
+        lv_display_flush_ready(disp);
+        return false;
     }
 }

@@ -50,7 +50,7 @@ pub fn init_lcd() -> PanelHandle {
         log::info!("Install JD9365S panel driver");
         let mut panel_handle = esp_lcd_panel_handle_t::default();
         let mut dpi_config_flags = esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags::default();
-        dpi_config_flags.set_use_dma2d(0);
+        dpi_config_flags.set_use_dma2d(1);
         let dpi_config = esp_lcd_dpi_panel_config_t {
             dpi_clk_src: soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
             dpi_clock_freq_mhz: 80,
