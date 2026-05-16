@@ -1,17 +1,12 @@
-use std::{
-    mem::MaybeUninit,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
+use std::mem::MaybeUninit;
 
 use embedded_graphics::pixelcolor::Rgb565;
 use esp_idf_svc::sys::{
     MALLOC_CAP_DEFAULT, MALLOC_CAP_DMA, MALLOC_CAP_SPIRAM, esp_lcd_dpi_panel_event_callbacks_t,
     esp_lcd_dpi_panel_register_event_callbacks, esp_lcd_panel_draw_bitmap, esp_log_level_set,
     esp_log_level_t_ESP_LOG_DEBUG, esp_log_level_t_ESP_LOG_INFO, heap_caps_get_info,
-    heap_caps_malloc, multi_heap_info_t, vPortYield, xTaskGetTickCount,
+    heap_caps_malloc, multi_heap_info_t, xPortGetTickRateHz, xQueueGenericCreate,
+    xQueueSemaphoreTake, xTaskGetTickCount,
 };
 use lv_bevy_ecs::{
     display::{Display, RenderMode},
@@ -76,20 +71,14 @@ fn main() {
     };
     log::info!("Display OK");
 
-    let dsi_done = Arc::new(AtomicBool::new(false));
-
-    let mut dsi_done_clone = dsi_done.clone();
+    let semaphore = unsafe { xQueueGenericCreate(1, 0, 3) };
 
     unsafe {
         let cbs = esp_lcd_dpi_panel_event_callbacks_t {
             on_color_trans_done: Some(crate::hx8394::notify_lvgl_flush_ready),
             ..Default::default()
         };
-        esp_lcd_dpi_panel_register_event_callbacks(
-            panel_handle,
-            &cbs,
-            (&raw mut dsi_done_clone).cast(),
-        );
+        esp_lcd_dpi_panel_register_event_callbacks(panel_handle, &cbs, semaphore.cast());
     }
 
     unsafe {
@@ -107,10 +96,7 @@ fn main() {
                 end.y + 1,
                 refresh.colors as *const _ as *const _,
             );
-            while !dsi_done.load(Ordering::Relaxed) {
-                vPortYield();
-            }
-            dsi_done.store(false, Ordering::Relaxed);
+            xQueueSemaphoreTake(semaphore, 1 * xPortGetTickRateHz());
         });
     }
 

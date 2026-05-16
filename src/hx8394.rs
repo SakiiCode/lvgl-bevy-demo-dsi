@@ -1,15 +1,9 @@
-use std::{
-    ffi::c_void,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-};
+use std::ffi::c_void;
 
 use esp_idf_svc::{
     hal::lcd::PanelHandle,
     sys::{
-        esp_lcd_dbi_io_config_t, esp_lcd_dpi_panel_config_t,
+        QueueHandle_t, esp_lcd_dbi_io_config_t, esp_lcd_dpi_panel_config_t,
         esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags, esp_lcd_dpi_panel_event_data_t,
         esp_lcd_dsi_bus_config_t, esp_lcd_dsi_bus_handle_t, esp_lcd_new_dsi_bus,
         esp_lcd_new_panel_hx8394, esp_lcd_new_panel_io_dbi, esp_lcd_panel_dev_config_t,
@@ -18,7 +12,7 @@ use esp_idf_svc::{
         esp_ldo_acquire_channel, esp_ldo_channel_config_t, esp_ldo_channel_handle_t,
         hx8394_vendor_config_t, hx8394_vendor_config_t__bindgen_ty_1,
         lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB565,
-        soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
+        soc_module_clk_t_SOC_MOD_CLK_PLL_F240M, xQueueGiveFromISR,
     },
 };
 
@@ -109,12 +103,10 @@ pub extern "C" fn notify_lvgl_flush_ready(
     _edata: *mut esp_lcd_dpi_panel_event_data_t,
     user_ctx: *mut c_void,
 ) -> bool {
-    let dsi_done_arc: *mut Arc<AtomicBool> = user_ctx.cast();
     unsafe {
-        dsi_done_arc
-            .as_mut()
-            .unwrap()
-            .store(true, Ordering::Relaxed);
+        let semaphore: QueueHandle_t = user_ctx.cast();
+        let mut ctx_sw_needed = 0i32;
+        xQueueGiveFromISR(semaphore, &mut ctx_sw_needed);
     }
     return false;
 }
