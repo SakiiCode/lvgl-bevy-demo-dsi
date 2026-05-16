@@ -78,15 +78,15 @@ fn main() {
         esp_lcd_dpi_panel_register_event_callbacks(panel_handle, &cbs, display.raw_mut().cast());
     }
 
-    display.register_raw::<_, BUFFER_LEN, Rgb565>(buffer, RenderMode::Partial, |refresh| {
-        let area = refresh.rectangle;
+    unsafe {
+        display.register_raw::<_, BUFFER_LEN, Rgb565>(buffer, RenderMode::Partial, |refresh| {
+            let area = refresh.rectangle;
 
-        let x_start = area.top_left.x;
-        let y_start = area.top_left.y;
-        let x_end = area.bottom_right().unwrap().x + 1;
-        let y_end = area.bottom_right().unwrap().y + 1;
+            let x_start = area.top_left.x;
+            let y_start = area.top_left.y;
+            let x_end = area.bottom_right().unwrap().x + 1;
+            let y_end = area.bottom_right().unwrap().y + 1;
 
-        unsafe {
             esp_lcd_panel_draw_bitmap(
                 panel_handle,
                 x_start,
@@ -95,8 +95,8 @@ fn main() {
                 y_end,
                 refresh.colors as *const _ as *const _,
             );
-        }
-    });
+        });
+    }
 
     log::info!("Draw Buffer OK");
 
