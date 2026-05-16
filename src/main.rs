@@ -1,11 +1,17 @@
-use std::mem::MaybeUninit;
+use std::{
+    mem::MaybeUninit,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use embedded_graphics::pixelcolor::Rgb565;
 use esp_idf_svc::sys::{
     MALLOC_CAP_DEFAULT, MALLOC_CAP_DMA, MALLOC_CAP_SPIRAM, esp_lcd_dpi_panel_event_callbacks_t,
     esp_lcd_dpi_panel_register_event_callbacks, esp_lcd_panel_draw_bitmap, esp_log_level_set,
     esp_log_level_t_ESP_LOG_DEBUG, esp_log_level_t_ESP_LOG_INFO, heap_caps_get_info,
-    heap_caps_malloc, multi_heap_info_t, xTaskGetTickCount,
+    heap_caps_malloc, multi_heap_info_t, vPortYield, xTaskGetTickCount,
 };
 use lv_bevy_ecs::{
     display::{Display, RenderMode},
@@ -70,31 +76,41 @@ fn main() {
     };
     log::info!("Display OK");
 
+    let dsi_done = Arc::new(AtomicBool::new(false));
+
+    let mut dsi_done_clone = dsi_done.clone();
+
     unsafe {
         let cbs = esp_lcd_dpi_panel_event_callbacks_t {
             on_color_trans_done: Some(crate::hx8394::notify_lvgl_flush_ready),
             ..Default::default()
         };
-        esp_lcd_dpi_panel_register_event_callbacks(panel_handle, &cbs, display.raw_mut().cast());
+        esp_lcd_dpi_panel_register_event_callbacks(
+            panel_handle,
+            &cbs,
+            (&raw mut dsi_done_clone).cast(),
+        );
     }
 
     unsafe {
         display.register_raw::<_, BUFFER_LEN, Rgb565>(buffer, RenderMode::Partial, |refresh| {
             let area = refresh.rectangle;
 
-            let x_start = area.top_left.x;
-            let y_start = area.top_left.y;
-            let x_end = area.bottom_right().unwrap().x + 1;
-            let y_end = area.bottom_right().unwrap().y + 1;
+            let start = area.top_left;
+            let end = area.bottom_right().unwrap();
 
             esp_lcd_panel_draw_bitmap(
                 panel_handle,
-                x_start,
-                y_start,
-                x_end,
-                y_end,
+                start.x,
+                start.y,
+                end.x + 1,
+                end.y + 1,
                 refresh.colors as *const _ as *const _,
             );
+            while !dsi_done.load(Ordering::Relaxed) {
+                vPortYield();
+            }
+            dsi_done.store(false, Ordering::Relaxed);
         });
     }
 

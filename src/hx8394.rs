@@ -1,4 +1,10 @@
-use std::ffi::c_void;
+use std::{
+    ffi::c_void,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use esp_idf_svc::{
     hal::lcd::PanelHandle,
@@ -15,7 +21,6 @@ use esp_idf_svc::{
         soc_module_clk_t_SOC_MOD_CLK_PLL_F240M,
     },
 };
-use lv_bevy_ecs::sys::{lv_display_flush_ready, lv_display_t};
 
 #[allow(unused)]
 pub fn init_lcd() -> PanelHandle {
@@ -104,9 +109,12 @@ pub extern "C" fn notify_lvgl_flush_ready(
     _edata: *mut esp_lcd_dpi_panel_event_data_t,
     user_ctx: *mut c_void,
 ) -> bool {
+    let dsi_done_arc: *mut Arc<AtomicBool> = user_ctx.cast();
     unsafe {
-        let disp: *mut lv_display_t = user_ctx.cast();
-        lv_display_flush_ready(disp);
-        return false;
+        dsi_done_arc
+            .as_mut()
+            .unwrap()
+            .store(true, Ordering::Relaxed);
     }
+    return false;
 }
