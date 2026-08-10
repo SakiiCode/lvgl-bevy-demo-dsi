@@ -57,14 +57,14 @@ fn main() {
 
     lv_tick_set_cb(|| unsafe { xTaskGetTickCount() });
 
-    const HOR_RES: u32 = 720;
-    const VER_RES: u32 = 1280;
-    const LINE_HEIGHT: u32 = VER_RES / 40;
+    const HOR_RES: usize = 720;
+    const VER_RES: usize = 1280;
+    const LINE_HEIGHT: usize = VER_RES / 40;
 
-    let mut display = Display::new(HOR_RES as i32, VER_RES as i32);
+    let mut display = Display::new(HOR_RES, VER_RES);
     // let buffer =
     //     DrawBuffer::<{ (HOR_RES * LINE_HEIGHT) as usize }, Rgb565>::new(HOR_RES, LINE_HEIGHT);
-    const BUFFER_LEN: usize = (HOR_RES * LINE_HEIGHT * LV_COLOR_DEPTH / 8) as usize;
+    const BUFFER_LEN: usize = (HOR_RES * LINE_HEIGHT * LV_COLOR_DEPTH as usize / 8) as usize;
     let buffer = unsafe {
         let ptr = heap_caps_malloc(BUFFER_LEN, MALLOC_CAP_SPIRAM | MALLOC_CAP_DMA).cast::<u8>();
         core::slice::from_raw_parts_mut(ptr, BUFFER_LEN)
@@ -82,22 +82,26 @@ fn main() {
     }
 
     unsafe {
-        display.register_raw::<_, BUFFER_LEN, Rgb565>(buffer, RenderMode::Partial, |refresh| {
-            let area = refresh.rectangle;
+        display.register_raw::<_, BUFFER_LEN, Rgb565>(
+            buffer,
+            RenderMode::Partial,
+            move |refresh| {
+                let area = refresh.rectangle;
 
-            let start = area.top_left;
-            let end = area.bottom_right().unwrap();
+                let start = area.top_left;
+                let end = area.bottom_right().unwrap();
 
-            esp_lcd_panel_draw_bitmap(
-                panel_handle,
-                start.x,
-                start.y,
-                end.x + 1,
-                end.y + 1,
-                refresh.colors as *const _ as *const _,
-            );
-            xQueueSemaphoreTake(semaphore, 1 * xPortGetTickRateHz());
-        });
+                esp_lcd_panel_draw_bitmap(
+                    panel_handle,
+                    start.x,
+                    start.y,
+                    end.x + 1,
+                    end.y + 1,
+                    refresh.colors as *const _ as *const _,
+                );
+                xQueueSemaphoreTake(semaphore, 1 * xPortGetTickRateHz());
+            },
+        );
     }
 
     log::info!("Draw Buffer OK");

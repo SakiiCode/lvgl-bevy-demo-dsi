@@ -1,4 +1,4 @@
-include = [{ path = "config-local.toml", optional = true }]
+include = [{ path = "config-local.toml" }]
 
 [build]
 target = "riscv32imafc-esp-espidf"
@@ -11,7 +11,6 @@ rustflags = ["--cfg", "espidf_time64"]
 
 [unstable]
 build-std = ["std", "panic_abort"]
-config-include = true
 
 [env]
 MCU = "esp32p4"
@@ -19,7 +18,6 @@ ESP_IDF_VERSION = "v5.3.3"  # v5.3.3 is the highest that works
 ESP_IDF_TOOLS_INSTALL_DIR = "workspace"
 DEP_LV_CONFIG_PATH = { relative = true, value = "." }
 CROSS_COMPILE = "riscv32-esp-elf"
-CFLAGS = "-march=rv32imafc -mabi=ilp32f"  # LV_COMPILE_ARGS is not enough
 
 # Uncomment this if you have moved the target dir by setting CARGO_TARGET_DIR or similar.
 # Required for now due to embuild limitations.
