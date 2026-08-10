@@ -15,8 +15,13 @@ use lv_bevy_ecs::{
     widgets::Label,
 };
 
+mod ek79007;
 mod hx8394;
 mod jd9365;
+
+use crate::ek79007 as display;
+// use crate::hx8394 as display;
+// use crate::jd9365 as display;
 
 #[unsafe(no_mangle)]
 pub fn get_memory_stats(monitor: &mut lv_mem_monitor_t) {
@@ -50,15 +55,18 @@ fn main() {
 
     log::info!("Hello, world!");
 
-    // let panel_handle = crate::jd9365::init_lcd();
-    let panel_handle = crate::hx8394::init_lcd();
+    let panel_handle = display::init_lcd();
 
     assert_ne!(panel_handle, core::ptr::null_mut());
 
     lv_tick_set_cb(|| unsafe { xTaskGetTickCount() });
 
-    const HOR_RES: usize = 720;
-    const VER_RES: usize = 1280;
+    // const HOR_RES: usize = 720;
+    // const VER_RES: usize = 1280;
+
+    const HOR_RES: usize = 1024;
+    const VER_RES: usize = 600;
+
     const LINE_HEIGHT: usize = VER_RES / 40;
 
     let mut display = Display::new(HOR_RES, VER_RES);
@@ -75,7 +83,7 @@ fn main() {
 
     unsafe {
         let cbs = esp_lcd_dpi_panel_event_callbacks_t {
-            on_color_trans_done: Some(crate::hx8394::notify_lvgl_flush_ready),
+            on_color_trans_done: Some(display::notify_lvgl_flush_ready),
             ..Default::default()
         };
         esp_lcd_dpi_panel_register_event_callbacks(panel_handle, &cbs, semaphore.cast());
