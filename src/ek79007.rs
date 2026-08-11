@@ -1,17 +1,22 @@
 use std::ffi::c_void;
 
 use esp_idf_svc::{
-    hal::lcd::PanelHandle,
+    hal::{
+        self as esp_idf_hal,
+        i2c::{I2cConfig, I2cDriver},
+        lcd::PanelHandle,
+        peripherals::Peripherals,
+        units::FromValueType,
+    },
     sys::{
-        QueueHandle_t, ek79007_vendor_config_t, ek79007_vendor_config_t__bindgen_ty_1,
+        EspError, QueueHandle_t, ek79007_vendor_config_t, ek79007_vendor_config_t__bindgen_ty_1,
         esp_lcd_dbi_io_config_t, esp_lcd_dpi_panel_config_t,
         esp_lcd_dpi_panel_config_t_extra_dpi_panel_flags, esp_lcd_dpi_panel_event_data_t,
         esp_lcd_dsi_bus_config_t, esp_lcd_dsi_bus_handle_t, esp_lcd_new_dsi_bus,
         esp_lcd_new_panel_ek79007, esp_lcd_new_panel_io_dbi, esp_lcd_panel_dev_config_t,
-        esp_lcd_panel_disp_on_off, esp_lcd_panel_handle_t, esp_lcd_panel_init,
-        esp_lcd_panel_io_handle_t, esp_lcd_panel_reset, esp_lcd_video_timing_t,
-        esp_ldo_acquire_channel, esp_ldo_channel_config_t, esp_ldo_channel_handle_t,
-        lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB565,
+        esp_lcd_panel_handle_t, esp_lcd_panel_init, esp_lcd_panel_io_handle_t, esp_lcd_panel_reset,
+        esp_lcd_video_timing_t, esp_ldo_acquire_channel, esp_ldo_channel_config_t,
+        esp_ldo_channel_handle_t, lcd_color_rgb_pixel_format_t_LCD_COLOR_PIXEL_FORMAT_RGB565,
         soc_module_clk_t_SOC_MOD_CLK_PLL_F240M, xQueueGiveFromISR,
     },
 };
@@ -19,8 +24,11 @@ use esp_idf_svc::{
 #[allow(unused)]
 pub fn init_lcd() -> PanelHandle {
     unsafe {
-        log::info!("MIPI DSI PHY Powered on");
+        // backlight must be initialized before DSI
+        init_backlight();
+        log::info!("I2C Backlight Powered on");
 
+        log::info!("Starting MIPI DSI LDO");
         let mut ldo_mipi_phy = esp_ldo_channel_handle_t::default();
         let ldo_mipi_phy_config = esp_ldo_channel_config_t {
             chan_id: 3,
@@ -92,7 +100,6 @@ pub fn init_lcd() -> PanelHandle {
         esp_lcd_new_panel_ek79007(mipi_dbi_io, &panel_config, &mut panel_handle);
         esp_lcd_panel_reset(panel_handle);
         esp_lcd_panel_init(panel_handle);
-        esp_lcd_panel_disp_on_off(panel_handle, true);
 
         panel_handle
     }
@@ -110,4 +117,26 @@ pub extern "C" fn notify_lvgl_flush_ready(
         xQueueGiveFromISR(semaphore, &mut ctx_sw_needed);
     }
     return false;
+}
+
+fn init_backlight() -> Result<(), EspError> {
+    let peripherals = unsafe { Peripherals::steal() };
+
+    // Initialize I2C driver on GPIO5 (SDA) and GPIO6 (SCL)
+    let config = I2cConfig::new().baudrate(100u32.kHz().into());
+    let mut i2c = I2cDriver::new(
+        peripherals.i2c0,
+        peripherals.pins.gpio7,
+        peripherals.pins.gpio8,
+        &config,
+    )?;
+
+    let chip_addr = 0x45u8;
+    let write_cmds: [[u8; 2]; 4] = [[0x95, 0x11], [0x95, 0x17], [0x96, 0x00], [0x96, 0xFF]];
+
+    for write_cmd in write_cmds {
+        i2c.write(chip_addr, &write_cmd, esp_idf_hal::delay::BLOCK)?;
+    }
+
+    Ok(())
 }
