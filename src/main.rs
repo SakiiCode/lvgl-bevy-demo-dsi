@@ -1,6 +1,5 @@
 use std::mem::MaybeUninit;
 
-use embedded_graphics::pixelcolor::Rgb565;
 use esp_idf_svc::sys::{
     MALLOC_CAP_DEFAULT, MALLOC_CAP_DMA, MALLOC_CAP_SPIRAM, esp_lcd_dpi_panel_event_callbacks_t,
     esp_lcd_dpi_panel_register_event_callbacks, esp_lcd_panel_draw_bitmap, esp_log_level_set,
@@ -11,16 +10,16 @@ use esp_idf_svc::sys::{
 use lv_bevy_ecs::{
     display::{Display, RenderMode},
     functions::*,
+    support::LvRgb565,
     sys::{LV_COLOR_DEPTH, LV_DEF_REFR_PERIOD, lv_mem_monitor_t},
-    widgets::Label,
 };
 
 mod ek79007;
 mod hx8394;
 mod jd9365;
 
-use crate::ek79007 as display;
-// use crate::hx8394 as display;
+// use crate::ek79007 as display;
+use crate::hx8394 as display;
 // use crate::jd9365 as display;
 
 #[unsafe(no_mangle)]
@@ -61,11 +60,11 @@ fn main() {
 
     lv_tick_set_cb(|| unsafe { xTaskGetTickCount() });
 
-    // const HOR_RES: usize = 720;
-    // const VER_RES: usize = 1280;
+    const HOR_RES: usize = 720;
+    const VER_RES: usize = 1280;
 
-    const HOR_RES: usize = 1024;
-    const VER_RES: usize = 600;
+    // const HOR_RES: usize = 1024;
+    // const VER_RES: usize = 600;
 
     const LINE_HEIGHT: usize = VER_RES / 40;
 
@@ -90,33 +89,29 @@ fn main() {
     }
 
     unsafe {
-        display.register_raw::<_, BUFFER_LEN, Rgb565>(
-            buffer,
-            RenderMode::Partial,
-            move |refresh| {
-                let area = refresh.rectangle;
+        display.register_raw::<_, LvRgb565>(buffer, RenderMode::Partial, move |refresh| {
+            let area = refresh.rectangle;
 
-                let start = area.top_left;
-                let end = area.bottom_right().unwrap();
+            let start = area.top_left;
+            let end = area.bottom_right().unwrap();
 
-                esp_lcd_panel_draw_bitmap(
-                    panel_handle,
-                    start.x,
-                    start.y,
-                    end.x + 1,
-                    end.y + 1,
-                    refresh.colors as *const _ as *const _,
-                );
-                xQueueSemaphoreTake(semaphore, 1 * xPortGetTickRateHz());
-            },
-        );
+            esp_lcd_panel_draw_bitmap(
+                panel_handle,
+                start.x,
+                start.y,
+                end.x + 1,
+                end.y + 1,
+                refresh.colors as *const _ as *const _,
+            );
+            xQueueSemaphoreTake(semaphore, 1 * xPortGetTickRateHz());
+        });
     }
 
     log::info!("Draw Buffer OK");
 
-    let mut label = Label::new();
-    label.set_text(c"asdasd");
-    label.leak();
+    unsafe {
+        lv_bevy_ecs::sys::lv_demo_widgets();
+    }
 
     unsafe {
         esp_idf_svc::sys::heap_caps_check_integrity_all(true);

@@ -24,16 +24,9 @@ name = "p4stdtest"
 # Remove `generic-queue-8` if you plan to use `embassy-time` WITH `embassy-executor`
 embassy-time = { version = "0.5", features = ["generic-queue-8"] }
 embedded-graphics = "0.8.0"
-esp-idf-svc = { version = "0.52.1", features = [
-  "critical-section",
-  "embassy-sync",
-  "embassy-time-driver"
-] }
+esp-idf-svc = { version = "0.52.1", features = ["critical-section", "embassy-sync", "embassy-time-driver"] }
 log = "0.4"
-lv_bevy_ecs = { version = "0.11.0", features = [
-  "critical-section",
-  "rust-alloc"
-] }
+lv_bevy_ecs = { version = "0.12.0-alpha.3", features = ["critical-section", "demos", "rust-alloc"] }
 static_cell = "2.1.1"
 
 [build-dependencies]
